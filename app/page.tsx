@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronRight, Loader2, ArrowLeft, Skull, Brain, Code, Terminal, Trophy, MessageSquare, Activity, Crown, GraduationCap, X, CheckCircle2, Users, Star, Flame, Zap, ShieldAlert, Swords, Heart, Monitor, Globe, Shield, Ticket, Box, AlertTriangle, Flag, TrendingUp, TrendingDown, Send, Bell } from "lucide-react";
+import { ChevronRight, Loader2, ArrowLeft, Skull, Brain, Code, Terminal, Trophy, MessageSquare, Activity, Crown, GraduationCap, X, CheckCircle2, Users, Star, Flame, Zap, ShieldAlert, Swords, Heart, Monitor, Globe, Shield, Ticket, Box, AlertTriangle, Flag, TrendingUp, TrendingDown, Send, Bell, Search, Rocket } from "lucide-react";
 
 const loadingMessages = [
   "Scanning channel activity...",
@@ -24,7 +24,8 @@ const calculateMatches = (myTraits: any, allChannels: any[], myChannel: string) 
         Math.pow(myTraits.yapLevel - c.traits.yapLevel, 2) +
         Math.pow(myTraits.egoLevel - c.traits.egoLevel, 2)
       );
-      const matchPercentage = Math.max(1, Math.round(100 - (distance / 20) * 100));
+      const maxDistance = 200;
+      const matchPercentage = Math.max(1, Math.round(100 - (distance / maxDistance) * 100));
       return { channel: c.channel, percentage: matchPercentage, distance };
     })
     .sort((a, b) => a.distance - b.distance)
@@ -250,7 +251,7 @@ const StoryViewer = ({ data, stats, onClose }: { data: any, stats: any, onClose:
           <X size={20} className="text-white" />
         </button>
       </div>
-      <div 
+      <div
         className="flex-1 relative"
         onClick={(e) => {
           if (window.getSelection()?.toString()) return;
@@ -306,13 +307,15 @@ declare global {
 
 export default function App() {
   const [username, setUsername] = useState("");
-  const [viewMode, setViewMode] = useState<'home' | 'loading' | 'story' | 'full'>('home');
+  const [viewMode, setViewMode] = useState<'home' | 'loading' | 'story' | 'full' | 'submitted'>('home');
   const [result, setResult] = useState<any>(null);
   const [leaderboards, setLeaderboards] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [loadingMsg, setLoadingMsg] = useState(loadingMessages[0]);
   const [expandedLanguage, setExpandedLanguage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [submittedChannel, setSubmittedChannel] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -333,6 +336,18 @@ export default function App() {
     }
   }, []);
 
+  // Handle ?channel= deep link from bot notification
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const channelParam = params.get('channel');
+    if (channelParam) {
+      analyzeChannel(undefined, channelParam, true);
+      // Clean URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Telegram Back Button handling
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -343,6 +358,7 @@ export default function App() {
       if (viewMode === 'full') setViewMode('home');
       else if (viewMode === 'story') setViewMode('home');
       else if (viewMode === 'loading') setViewMode('home');
+      else if (viewMode === 'submitted') setViewMode('home');
     };
 
     if (viewMode !== 'home') {
@@ -402,10 +418,10 @@ export default function App() {
         return setTimeout(() => finishProcess(data.data), 800);
       }
 
-      // Otherwise, show toast and return to home - bot will notify when done
+      // Otherwise, show "analysis started" page
       window.Telegram?.WebApp.HapticFeedback.notificationOccurred('success');
-      setToast({ message: `Analysis started for @${cleanName}! You'll get a notification when it's ready.`, type: 'success' });
-      setViewMode('home');
+      setSubmittedChannel(cleanName);
+      setViewMode('submitted');
 
     } catch (err) { console.error(err); setToast({ message: 'Something went wrong. Try again.', type: 'error' }); setViewMode('home'); }
   };
@@ -413,15 +429,40 @@ export default function App() {
   // Toast UI overlay
   const ToastOverlay = toast ? (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] animate-[slideDown_0.3s_ease-out]">
-      <div className={`rounded-2xl px-5 py-4 flex items-center gap-3 shadow-2xl border backdrop-blur-xl ${
-        toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-red-500/20 border-red-500/30 text-red-300'
-      }`}>
+      <div className={`rounded-2xl px-5 py-4 flex items-center gap-3 shadow-2xl border backdrop-blur-xl ${toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-red-500/20 border-red-500/30 text-red-300'
+        }`}>
         {toast.type === 'success' ? <Bell size={20} className="shrink-0" /> : <AlertTriangle size={20} className="shrink-0" />}
         <span className="text-sm font-bold leading-tight">{toast.message}</span>
         <button onClick={() => setToast(null)} className="ml-auto shrink-0 p-1 hover:bg-white/10 rounded-full transition-colors"><X size={16} /></button>
       </div>
     </div>
   ) : null;
+
+  if (viewMode === 'submitted') {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative max-w-md mx-auto w-full">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/15 blur-[120px] rounded-full" />
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <div className="w-24 h-24 mb-8 bg-emerald-500/20 rounded-full flex items-center justify-center border border-emerald-500/30 animate-pulse">
+            <Rocket size={40} className="text-emerald-400" />
+          </div>
+          <h2 className="text-3xl font-black tracking-tight text-white mb-3">Analysis Started!</h2>
+          <p className="text-lg text-gray-400 font-medium mb-2 max-w-xs leading-relaxed">
+            We&apos;re analyzing <span className="text-[#FF6B00] font-black">@{submittedChannel}</span>
+          </p>
+          <p className="text-sm text-gray-500 font-medium mb-10 max-w-xs leading-relaxed">
+            You&apos;ll receive a notification through the bot when your results are ready.
+          </p>
+          <button
+            onClick={() => setViewMode('home')}
+            className="bg-gradient-to-r from-[#FF6B00] to-[#ff4000] text-black rounded-full px-8 py-4 font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,107,0,0.3)] flex items-center gap-2"
+          >
+            <ArrowLeft size={20} strokeWidth={3} /> Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (viewMode === 'loading') {
     return (
@@ -585,96 +626,128 @@ export default function App() {
 
       {leaderboards ? (
         <div className="pb-20">
-          {leaderboards.mostToxic.length > 0 && (
-            <div className="mb-12">
-              <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Skull className="text-red-500" /> Most Toxic</h2><span className="text-xs font-bold bg-red-500/20 text-red-500 px-3 py-1 rounded-full">TOP 10</span></div>
-              <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
-                {leaderboards.mostToxic.map((item: any, i: number) => (
-                  <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
-                    <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
-                      <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(239,68,68,0.2)] border-2 border-[#1A1A1A] group-hover:border-red-500" alt={item.channel} />
-                      {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><Crown size={20} className="text-yellow-500 fill-yellow-500" /></div>}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-500 text-black text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-red-400 transition-colors mt-1">@{item.channel}</span>
+          <div className="px-6 mb-10 relative">
+            <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+              <Search className="text-gray-500 w-5 h-5" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search analyzed channels..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#1A1A1A] text-white rounded-2xl py-4 pl-12 pr-4 outline-none border border-white/5 focus:border-white/20 transition-all placeholder:text-gray-600"
+            />
+          </div>
+
+          {searchQuery ? (
+            <div className="px-6">
+              <h2 className="text-xl font-black tracking-tight text-white mb-4">Search Results</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {stats?.rawChannels?.filter((c: any) => c.channel.toLowerCase().includes(searchQuery.toLowerCase())).map((c: any, i: number) => (
+                  <div key={i} className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 flex flex-col items-center gap-3 cursor-pointer hover:border-[#FF6B00]/50 transition-all" onClick={() => analyzeChannel(undefined, c.channel, true)}>
+                    <img src={`/api/avatar?channel=${c.channel}`} className="w-16 h-16 rounded-full border border-white/10 object-cover shadow-lg" alt={c.channel} />
+                    <span className="font-bold text-white w-full text-center truncate text-sm">@{c.channel}</span>
                   </div>
                 ))}
+                {stats?.rawChannels?.filter((c: any) => c.channel.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                  <div className="col-span-2 text-center text-gray-500 py-10 font-bold bg-[#151515] rounded-2xl border border-white/5">No channels found</div>
+                )}
               </div>
             </div>
-          )}
-
-          {leaderboards.smartest.length > 0 && (
-            <div className="mb-12">
-              <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Brain className="text-blue-500" /> Biggest Brains</h2><span className="text-xs font-bold bg-blue-500/20 text-blue-500 px-3 py-1 rounded-full">TOP 10</span></div>
-              <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
-                {leaderboards.smartest.map((item: any, i: number) => (
-                  <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
-                    <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
-                      <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(59,130,246,0.2)] border-2 border-[#1A1A1A] group-hover:border-blue-500" alt={item.channel} />
-                      {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><GraduationCap size={20} className="text-yellow-500 fill-yellow-500" /></div>}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-blue-400 transition-colors mt-1">@{item.channel}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {leaderboards.highestAura && leaderboards.highestAura.length > 0 && (
-            <div className="mb-12">
-              <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Zap className="text-indigo-500" /> Highest Aura</h2><span className="text-xs font-bold bg-indigo-500/20 text-indigo-500 px-3 py-1 rounded-full">TOP 10</span></div>
-              <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
-                {leaderboards.highestAura.map((item: any, i: number) => (
-                  <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
-                    <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
-                      <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(99,102,241,0.2)] border-2 border-[#1A1A1A] group-hover:border-indigo-500" alt={item.channel} />
-                      {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><Crown size={20} className="text-yellow-500 fill-yellow-500" /></div>}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-indigo-400 transition-colors mt-1">@{item.channel}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {leaderboards.topLanguages.length > 0 && (
-            <div className="px-6 pb-16">
-              <h2 className="text-2xl font-black tracking-tight text-white mb-4 flex items-center gap-2"><Code className="text-[#FF6B00]" /> Popular Languages</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {leaderboards.topLanguages.map((item: any, i: number) => {
-                  const isExpanded = expandedLanguage === item.name;
-                  return (
-                    <div
-                      key={i}
-                      onClick={() => setExpandedLanguage(isExpanded ? null : item.name)}
-                      className={`cursor-pointer rounded-[2rem] p-5 flex flex-col justify-between relative overflow-hidden transition-all duration-300 shadow-lg ${isExpanded ? 'col-span-2 aspect-auto min-h-[160px]' : 'h-full'} ${i === 0 ? 'bg-gradient-to-br from-[#FF6B00] to-[#ff3300] text-black border-none' : 'bg-[#151515] text-white border border-white/5 hover:border-white/20'}`}
-                    >
-                      <Code className={`absolute -right-4 -top-4 w-32 h-32 opacity-10 transition-transform ${isExpanded ? 'rotate-12 scale-110' : ''} ${i === 0 ? 'text-black' : 'text-gray-500'}`} strokeWidth={1} />
-                      <span className={`text-xl font-black relative z-10 ${i === 0 ? 'opacity-80' : 'text-gray-600'}`}>#{i + 1}</span>
-                      <div className="relative z-10">
-                        <div className="text-[2rem] font-black tracking-tighter leading-none mb-1 break-words">{item.name}</div>
-                        <div className={`text-sm font-bold ${i === 0 ? 'opacity-80' : 'text-gray-400'}`}>{item.count} users</div>
-                      </div>
-                      {isExpanded && item.channels && (
-                        <div className={`mt-4 pt-4 border-t relative z-20 ${i === 0 ? 'border-black/20' : 'border-white/10'}`}>
-                          <div className={`text-xs font-bold uppercase tracking-widest mb-3 ${i === 0 ? 'text-black/60' : 'text-gray-500'}`}>Channels</div>
-                          <div className="flex overflow-x-auto gap-3 pb-2 snap-x hide-scrollbar">
-                            {item.channels.map((ch: string, idx: number) => (
-                              <div key={idx} className="flex flex-col items-center gap-1 shrink-0 snap-start cursor-pointer group/ch" onClick={(e) => { e.stopPropagation(); analyzeChannel(undefined, ch, true); }}>
-                                <img src={`/api/avatar?channel=${ch}`} className={`w-12 h-12 rounded-full object-cover border-2 transition-transform group-hover/ch:scale-110 ${i === 0 ? 'border-black/20' : 'border-[#1A1A1A]'}`} />
-                                <span className={`text-[10px] font-bold w-12 truncate text-center ${i === 0 ? 'text-black' : 'text-gray-300'}`}>@{ch}</span>
-                              </div>
-                            ))}
-                          </div>
+          ) : (
+            <>
+              {leaderboards.mostToxic.length > 0 && (
+                <div className="mb-12">
+                  <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Skull className="text-red-500" /> Most Toxic</h2><span className="text-xs font-bold bg-red-500/20 text-red-500 px-3 py-1 rounded-full">TOP 10</span></div>
+                  <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
+                    {leaderboards.mostToxic.map((item: any, i: number) => (
+                      <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
+                        <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
+                          <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(239,68,68,0.2)] border-2 border-[#1A1A1A] group-hover:border-red-500" alt={item.channel} />
+                          {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><Crown size={20} className="text-yellow-500 fill-yellow-500" /></div>}
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-500 text-black text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+                        <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-red-400 transition-colors mt-1">@{item.channel}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {leaderboards.smartest.length > 0 && (
+                <div className="mb-12">
+                  <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Brain className="text-blue-500" /> Biggest Brains</h2><span className="text-xs font-bold bg-blue-500/20 text-blue-500 px-3 py-1 rounded-full">TOP 10</span></div>
+                  <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
+                    {leaderboards.smartest.map((item: any, i: number) => (
+                      <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
+                        <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
+                          <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(59,130,246,0.2)] border-2 border-[#1A1A1A] group-hover:border-blue-500" alt={item.channel} />
+                          {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><GraduationCap size={20} className="text-yellow-500 fill-yellow-500" /></div>}
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-blue-400 transition-colors mt-1">@{item.channel}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {leaderboards.highestAura && leaderboards.highestAura.length > 0 && (
+                <div className="mb-12">
+                  <div className="px-6 flex items-center justify-between mb-4"><h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2"><Zap className="text-indigo-500" /> Highest Aura</h2><span className="text-xs font-bold bg-indigo-500/20 text-indigo-500 px-3 py-1 rounded-full">TOP 10</span></div>
+                  <div className="flex overflow-x-auto gap-4 pb-6 pt-2 snap-x hide-scrollbar px-6">
+                    {leaderboards.highestAura.map((item: any, i: number) => (
+                      <div key={i} className="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer w-[4.5rem] group" onClick={() => analyzeChannel(undefined, item.channel, true)}>
+                        <div className="relative transform group-hover:-translate-y-2 transition-all duration-300">
+                          <img src={`/api/avatar?channel=${item.channel}`} className="w-[4.5rem] h-[4.5rem] rounded-full object-cover shadow-[0_8px_20px_rgba(99,102,241,0.2)] border-2 border-[#1A1A1A] group-hover:border-indigo-500" alt={item.channel} />
+                          {i === 0 && <div className="absolute -top-3 -right-2 drop-shadow-md rotate-12"><Crown size={20} className="text-yellow-500 fill-yellow-500" /></div>}
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[12px] font-black px-2.5 py-0.5 rounded-full border-2 border-black">{item.score}</div>
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 w-full truncate text-center group-hover:text-indigo-400 transition-colors mt-1">@{item.channel}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {leaderboards.topLanguages.length > 0 && (
+                <div className="px-6 pb-16">
+                  <h2 className="text-2xl font-black tracking-tight text-white mb-4 flex items-center gap-2"><Code className="text-[#FF6B00]" /> Popular Languages</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    {leaderboards.topLanguages.map((item: any, i: number) => {
+                      const isExpanded = expandedLanguage === item.name;
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => setExpandedLanguage(isExpanded ? null : item.name)}
+                          className={`cursor-pointer rounded-[2rem] p-5 flex flex-col justify-between relative overflow-hidden transition-all duration-300 shadow-lg ${isExpanded ? 'col-span-2 aspect-auto min-h-[160px]' : 'h-full'} ${i === 0 ? 'bg-gradient-to-br from-[#FF6B00] to-[#ff3300] text-black border-none' : 'bg-[#151515] text-white border border-white/5 hover:border-white/20'}`}
+                        >
+                          <Code className={`absolute -right-4 -top-4 w-32 h-32 opacity-10 transition-transform ${isExpanded ? 'rotate-12 scale-110' : ''} ${i === 0 ? 'text-black' : 'text-gray-500'}`} strokeWidth={1} />
+                          <span className={`text-xl font-black relative z-10 ${i === 0 ? 'opacity-80' : 'text-gray-600'}`}>#{i + 1}</span>
+                          <div className="relative z-10">
+                            <div className="text-[2rem] font-black tracking-tighter leading-none mb-1 break-words">{item.name}</div>
+                            <div className={`text-sm font-bold ${i === 0 ? 'opacity-80' : 'text-gray-400'}`}>{item.count} users</div>
+                          </div>
+                          {isExpanded && item.channels && (
+                            <div className={`mt-4 pt-4 border-t relative z-20 ${i === 0 ? 'border-black/20' : 'border-white/10'}`}>
+                              <div className={`text-xs font-bold uppercase tracking-widest mb-3 ${i === 0 ? 'text-black/60' : 'text-gray-500'}`}>Channels</div>
+                              <div className="flex overflow-x-auto gap-3 pb-2 snap-x hide-scrollbar">
+                                {item.channels.map((ch: string, idx: number) => (
+                                  <div key={idx} className="flex flex-col items-center gap-1 shrink-0 snap-start cursor-pointer group/ch" onClick={(e) => { e.stopPropagation(); analyzeChannel(undefined, ch, true); }}>
+                                    <img src={`/api/avatar?channel=${ch}`} className={`w-12 h-12 rounded-full object-cover border-2 transition-transform group-hover/ch:scale-110 ${i === 0 ? 'border-black/20' : 'border-[#1A1A1A]'}`} />
+                                    <span className={`text-[10px] font-bold w-12 truncate text-center ${i === 0 ? 'text-black' : 'text-gray-300'}`}>@{ch}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (
