@@ -59,6 +59,15 @@ export async function GET() {
       }
     }));
 
+    // Recent analyses sorted by completedAt
+    const recentAnalyses = [...channels]
+      .filter(c => c.completedAt)
+      .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+      .slice(0, 5)
+      .map(c => ({ channel: c.channel, completedAt: c.completedAt, personality: c.analysis.personalityType?.title }));
+
+    const counterValue = Math.max(parseInt(totalAnalyzed || '0', 10), channels.length);
+
     return Response.json({
       leaderboards: {
         mostToxic: mostToxic.map(c => ({ channel: c.channel, score: c.analysis.spicyTraits.toxicity.score })),
@@ -66,11 +75,12 @@ export async function GET() {
         mostChaotic: mostChaotic.map(c => ({ channel: c.channel, score: c.analysis.spicyTraits.chaosLevel.score })),
         highestAura: highestAura.map(c => ({ channel: c.channel, score: c.analysis.goodTraits?.aura?.score || 0 })),
         topLanguages,
-        topFrameworks
+        topFrameworks,
+        recentAnalyses
       },
       stats: {
         total: channels.length,
-        totalAnalyzed: parseInt(totalAnalyzed || '0', 10),
+        totalAnalyzed: counterValue,
         toxicity: allToxicityScores,
         smartness: allSmartnessScores,
         rawChannels
