@@ -1,8 +1,5 @@
 import Redis from 'ioredis';
 
-// Connect to Redis using the URL from environment variables
-const redis = new Redis(process.env.REDIS_URL as string);
-
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const jobId = url.searchParams.get('jobId');
@@ -12,8 +9,10 @@ export async function GET(req: Request) {
   }
 
   try {
+    const redis = new Redis(process.env.REDIS_URL as string);
     // Attempt to get the job result from Redis
     const resultString = await redis.get(`job:${jobId}`);
+    redis.disconnect();
     
     if (resultString) {
       // If we found it, parse it and return completed status
