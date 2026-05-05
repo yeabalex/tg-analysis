@@ -13,7 +13,14 @@ const groq = createOpenAI({
 export const analyzeChannelBackground = inngest.createFunction(
   {
     id: "analyze-telegram-channel",
-    retries: 2, // Inngest will automatically retry if this fails!
+    retries: 0, 
+    onFailure: async ({ error, event }) => {
+      const jobId = event.data.event.data.jobId;
+      const Redis = require('ioredis');
+      const redis = new Redis(process.env.REDIS_URL);
+      await redis.set(`job:${jobId}`, JSON.stringify({ error: error.message || "Failed to analyze channel" }), 'EX', 86400);
+      redis.disconnect();
+    },
     triggers: [{ event: "app/analyze.channel" }]
   },
   async ({ event, step }) => {

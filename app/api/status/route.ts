@@ -1,5 +1,7 @@
 import Redis from 'ioredis';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const jobId = url.searchParams.get('jobId');

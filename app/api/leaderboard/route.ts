@@ -1,5 +1,7 @@
 import Redis from 'ioredis';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const redis = new Redis(process.env.REDIS_URL as string);

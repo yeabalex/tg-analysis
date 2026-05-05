@@ -345,7 +345,7 @@ export default function App() {
   }, [viewMode]);
 
   useEffect(() => {
-    fetch('/api/leaderboard').then(r => r.json()).then(data => { setLeaderboards(data.leaderboards); setStats(data.stats); }).catch(console.error);
+    fetch(`/api/leaderboard?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(data => { setLeaderboards(data.leaderboards); setStats(data.stats); }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -375,11 +375,18 @@ export default function App() {
       if (data.cached) return setTimeout(() => finishProcess(data.data), 800);
 
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/status?jobId=${data.jobId}`);
+        const statusRes = await fetch(`/api/status?jobId=${data.jobId}&t=${Date.now()}`, { cache: 'no-store' });
         const statusData = await statusRes.json();
         if (statusData.status === "completed") {
-          clearInterval(poll); finishProcess(statusData.data);
-          fetch('/api/leaderboard').then(r => r.json()).then(d => { setLeaderboards(d.leaderboards); setStats(d.stats); });
+          clearInterval(poll);
+          if (statusData.data.error) {
+            window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+            alert(statusData.data.error);
+            setViewMode('home');
+          } else {
+            finishProcess(statusData.data);
+            fetch(`/api/leaderboard?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(d => { setLeaderboards(d.leaderboards); setStats(d.stats); });
+          }
         }
       }, 2000);
     } catch (err) { console.error(err); setViewMode('home'); }
