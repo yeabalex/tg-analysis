@@ -316,6 +316,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [submittedChannel, setSubmittedChannel] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -341,7 +342,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const channelParam = params.get('channel');
     if (channelParam) {
-      analyzeChannel(undefined, channelParam, true);
+      analyzeChannel(undefined, channelParam, false);
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -392,6 +393,7 @@ export default function App() {
     const cleanName = targetUsername.replace('@', '').trim();
     window.Telegram?.WebApp.HapticFeedback.impactOccurred('medium');
     setResult(null); setUsername(cleanName);
+    setIsSubmitting(true);
 
     // Get Telegram chatId for bot notification
     const chatId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null;
@@ -399,6 +401,7 @@ export default function App() {
     try {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelName: cleanName, chatId }) });
       const data = await res.json();
+      setIsSubmitting(false);
 
       if (data.error) {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
@@ -423,7 +426,12 @@ export default function App() {
       setSubmittedChannel(cleanName);
       setViewMode('submitted');
 
-    } catch (err) { console.error(err); setToast({ message: 'Something went wrong. Try again.', type: 'error' }); setViewMode('home'); }
+    } catch (err) { 
+      console.error(err); 
+      setIsSubmitting(false);
+      setToast({ message: 'Something went wrong. Try again.', type: 'error' }); 
+      setViewMode('home'); 
+    }
   };
 
   // Toast UI overlay
@@ -620,7 +628,13 @@ export default function App() {
         <form onSubmit={(e) => analyzeChannel(e, undefined, false)} className="relative group z-10">
           <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none"><span className="text-gray-400 font-bold text-xl">@</span></div>
           <input type="text" className="w-full bg-[#151515] text-white rounded-[2rem] py-6 pl-12 pr-32 text-xl font-bold outline-none transition-all placeholder:text-gray-600 border border-white/5 focus:border-[#FF6B00]/50 focus:bg-[#1A1A1A] shadow-2xl" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <button type="submit" className="absolute inset-y-2 right-2 bg-gradient-to-r from-[#FF6B00] to-[#ff4000] text-black rounded-[1.5rem] px-5 font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg">ANALYZE</button>
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="absolute inset-y-2 right-2 bg-gradient-to-r from-[#FF6B00] to-[#ff4000] text-black rounded-[1.5rem] px-5 font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-80 disabled:hover:scale-100 disabled:cursor-not-allowed w-32"
+          >
+            {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin text-black" /> : "ANALYZE"}
+          </button>
         </form>
       </div>
 
