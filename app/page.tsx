@@ -316,6 +316,8 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [submittedChannel, setSubmittedChannel] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-dismiss toast
@@ -336,6 +338,30 @@ export default function App() {
       tg.setBackgroundColor('#000000');
     }
   }, []);
+
+  // Debounced Search from Redis DB
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+        const data = await res.json();
+        setSearchResults(data.results || []);
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Handle ?channel= deep link from bot notification
   useEffect(() => {
@@ -656,17 +682,21 @@ export default function App() {
           {searchQuery ? (
             <div className="px-6">
               <h2 className="text-xl font-black tracking-tight text-white mb-4">Search Results</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {stats?.rawChannels?.filter((c: any) => c.channel.toLowerCase().includes(searchQuery.toLowerCase())).map((c: any, i: number) => (
-                  <div key={i} className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 flex flex-col items-center gap-3 cursor-pointer hover:border-[#FF6B00]/50 transition-all" onClick={() => analyzeChannel(undefined, c.channel, true)}>
-                    <img src={`/api/avatar?channel=${c.channel}`} className="w-16 h-16 rounded-full border border-white/10 object-cover shadow-lg" alt={c.channel} />
-                    <span className="font-bold text-white w-full text-center truncate text-sm">@{c.channel}</span>
-                  </div>
-                ))}
-                {stats?.rawChannels?.filter((c: any) => c.channel.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                  <div className="col-span-2 text-center text-gray-500 py-10 font-bold bg-[#151515] rounded-2xl border border-white/5">No channels found</div>
-                )}
-              </div>
+              {isSearching ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-[#FF6B00] animate-spin" strokeWidth={2} /></div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {searchResults.map((channel: string, i: number) => (
+                    <div key={i} className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 flex flex-col items-center gap-3 cursor-pointer hover:border-[#FF6B00]/50 transition-all" onClick={() => analyzeChannel(undefined, channel, true)}>
+                      <img src={`/api/avatar?channel=${channel}`} className="w-16 h-16 rounded-full border border-white/10 object-cover shadow-lg" alt={channel} />
+                      <span className="font-bold text-white w-full text-center truncate text-sm">@{channel}</span>
+                    </div>
+                  ))}
+                  {searchResults.length === 0 && (
+                    <div className="col-span-2 text-center text-gray-500 py-10 font-bold bg-[#151515] rounded-2xl border border-white/5">No channels found</div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <>
