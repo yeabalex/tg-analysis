@@ -648,9 +648,20 @@ export default function App() {
       {ToastOverlay}
       <div className="pt-16 pb-12 px-6 relative">
         <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#FF6B00]/10 to-transparent pointer-events-none" />
-        <h1 className="text-[4rem] font-black tracking-tighter leading-[0.9] mb-8 text-white relative z-10">
+        <h1 className="text-[4rem] font-black tracking-tighter leading-[0.9] mb-6 text-white relative z-10">
           Channel <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF6B00] to-[#ff2a00]">Analyzer.</span>
         </h1>
+        {stats && (stats.totalAnalyzed > 0 || stats.total > 0) && (
+          <div className="relative z-10 mb-8 flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 w-fit backdrop-blur-sm">
+            <div className="bg-[#FF6B00]/20 p-2 rounded-xl">
+              <Users size={18} className="text-[#FF6B00]" />
+            </div>
+            <div>
+              <div className="text-2xl font-black tracking-tight text-white leading-none">{(stats.totalAnalyzed || stats.total).toLocaleString()}</div>
+              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Creators Analyzed</div>
+            </div>
+          </div>
+        )}
         <form onSubmit={(e) => analyzeChannel(e, undefined, false)} className="relative group z-10">
           <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none"><span className="text-gray-400 font-bold text-xl">@</span></div>
           <input type="text" className="w-full bg-[#151515] text-white rounded-[2rem] py-6 pl-12 pr-32 text-xl font-bold outline-none transition-all placeholder:text-gray-600 border border-white/5 focus:border-[#FF6B00]/50 focus:bg-[#1A1A1A] shadow-2xl" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />

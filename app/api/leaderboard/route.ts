@@ -13,6 +13,7 @@ export async function GET() {
     }
 
     const rawData = await redis.mget(...keys);
+    const totalAnalyzed = await redis.get('stats:total_analyzed');
     redis.disconnect();
 
     const channels = rawData
@@ -69,6 +70,7 @@ export async function GET() {
       },
       stats: {
         total: channels.length,
+        totalAnalyzed: parseInt(totalAnalyzed || '0', 10),
         toxicity: allToxicityScores,
         smartness: allSmartnessScores,
         rawChannels

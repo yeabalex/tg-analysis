@@ -138,6 +138,9 @@ export const analyzeChannelBackground = inngest.createFunction(
       await redis.set(`job:${jobId}`, JSON.stringify(payload), 'EX', 86400);
       await redis.set(`channel:${channelName.toLowerCase()}`, JSON.stringify(payload), 'EX', 86400);
 
+      // Increment persistent all-time counter for total creators analyzed
+      await redis.incr('stats:total_analyzed');
+
       // Disconnect cleanly
       redis.disconnect();
     });
