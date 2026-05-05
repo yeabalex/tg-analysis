@@ -34,8 +34,8 @@ export const analyzeChannelBackground = inngest.createFunction(
 
     const recentMessages = messages.slice(-50).join('\n\n');
 
-    let analysis;
-    let engine;
+    let analysis: any;
+    let engine: string = '';
 
     // Step 2: Check if Gemini is on a 30-minute cooldown
     const isGeminiRateLimited = await step.run("check-gemini-cooldown", async () => {
