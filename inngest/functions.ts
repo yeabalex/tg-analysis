@@ -1,14 +1,8 @@
 import { inngest } from "./client";
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { analyzerSchema, scrapeTelegramChannel, generatePrompt } from '../app/api/utils';
-
-// Initialize Groq for the fallback
-const groq = createOpenAI({
-  baseURL: 'https://api.groq.com/openai/v1',
-  apiKey: process.env.GROQ_API_KEY,
-});
 
 export const analyzeChannelBackground = inngest.createFunction(
   {
@@ -43,25 +37,70 @@ export const analyzeChannelBackground = inngest.createFunction(
     let analysis;
     let engine;
 
-    // Step 2: Try Gemini (Plan A)
-    try {
-      const geminiResult = await step.run("analyze-with-gemini", async () => {
-        console.log(`[JOB ${jobId}] Attempting Plan A: Gemini 2.5 Flash...`);
-        const result = await generateObject({
-          model: google('gemini-2.5-flash'),
-          schema: analyzerSchema,
-          prompt: generatePrompt(channelName, recentMessages),
+    // Step 2: Check if Gemini is on a 30-minute cooldown
+    const isGeminiRateLimited = await step.run("check-gemini-cooldown", async () => {
+      const Redis = require('ioredis');
+      const redis = new Redis(process.env.REDIS_URL);
+      const isLimited = await redis.get('gemini:rate_limited');
+      redis.disconnect();
+      return !!isLimited;
+    });
+
+    if (!isGeminiRateLimited) {
+      try {
+        const geminiResult = await step.run("analyze-with-gemini", async () => {
+          console.log(`[JOB ${jobId}] Attempting Plan A: Gemini 2.5 Flash...`);
+          
+          // Round-robin (random) selection for Gemini keys
+          const keysStr = process.env.GOOGLE_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
+          const keys = keysStr.split(',').map(k => k.trim()).filter(Boolean);
+          const selectedKey = keys.length > 0 ? keys[Math.floor(Math.random() * keys.length)] : undefined;
+          
+          const google = createGoogleGenerativeAI({ apiKey: selectedKey });
+
+          try {
+            const result = await generateObject({
+              model: google('gemini-2.5-flash'),
+              schema: analyzerSchema,
+              prompt: generatePrompt(channelName, recentMessages),
+            });
+            return result.object;
+          } catch (error: any) {
+            console.error(`[JOB ${jobId}] Gemini Error:`, error.message);
+            // If it's a rate limit error (429), set a 30-minute cooldown in Redis
+            if (error.statusCode === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate') || error.message?.toLowerCase().includes('exhausted')) {
+              console.log(`[JOB ${jobId}] ⚠️ Gemini rate limit hit! Setting 30-minute cooldown...`);
+              const Redis = require('ioredis');
+              const redis = new Redis(process.env.REDIS_URL);
+              await redis.set('gemini:rate_limited', 'true', 'EX', 1800);
+              redis.disconnect();
+            }
+            throw error; // Let Inngest catch it and trigger Plan B
+          }
         });
-        return result.object;
-      });
-      analysis = geminiResult;
-      engine = 'Gemini 2.5 Flash';
+        analysis = geminiResult;
+        engine = 'Gemini 2.5 Flash';
 
-    } catch (err) {
+      } catch (err) {
+        console.log(`[JOB ${jobId}] Gemini failed. Falling back to Plan B: Groq Llama 3.3...`);
+      }
+    } else {
+      console.log(`[JOB ${jobId}] 🛑 Gemini is currently on a 30-minute cooldown. Skipping straight to Groq...`);
+    }
+
+    if (!analysis) {
       // Step 3: Fallback to Groq (Plan B)
-      console.log(`[JOB ${jobId}] Gemini failed. Falling back to Plan B: Groq Llama 3.3...`);
-
       const groqResultText = await step.run("analyze-with-groq", async () => {
+        // Round-robin (random) selection for Groq keys
+        const keysStr = process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '';
+        const keys = keysStr.split(',').map(k => k.trim()).filter(Boolean);
+        const selectedKey = keys.length > 0 ? keys[Math.floor(Math.random() * keys.length)] : undefined;
+        
+        const groq = createOpenAI({
+          baseURL: 'https://api.groq.com/openai/v1',
+          apiKey: selectedKey,
+        });
+
         const groqResult = await generateText({
           model: groq('llama-3.3-70b-versatile'),
           prompt: generatePrompt(channelName, recentMessages) + `\n\nCRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NOT wrap it in markdown \`\`\`json blocks. Do not add any conversational text. 
