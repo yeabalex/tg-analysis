@@ -250,9 +250,20 @@ const StoryViewer = ({ data, stats, onClose }: { data: any, stats: any, onClose:
           <X size={20} className="text-white" />
         </button>
       </div>
-      <div className="absolute inset-y-20 left-0 w-1/3 z-40" onClick={() => slide > 0 && setSlide(s => s - 1)} />
-      <div className="absolute inset-y-20 right-0 w-2/3 z-40" onClick={() => slide < slides.length - 1 ? setSlide(s => s + 1) : onClose()} />
-      <div className="flex-1 relative">
+      <div 
+        className="flex-1 relative"
+        onClick={(e) => {
+          if (window.getSelection()?.toString()) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          if (x < rect.width / 3) {
+            if (slide > 0) setSlide(s => s - 1);
+          } else {
+            if (slide < slides.length - 1) setSlide(s => s + 1);
+            else onClose();
+          }
+        }}
+      >
         {slides.map((s, i) => (
           <div key={s.id} className={`absolute inset-0 transition-opacity duration-300 ${slide === i ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
             {s.content}
