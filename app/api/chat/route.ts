@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const channelName = body.channelName; 
+    const chatId = body.chatId;
 
     if (!channelName) {
       return Response.json({ error: "Please provide a channelName to analyze." }, { status: 400 });
@@ -45,7 +46,8 @@ export async function POST(req: Request) {
       name: "app/analyze.channel",
       data: {
         channelName,
-        jobId
+        jobId,
+        chatId: chatId || null
       }
     });
 

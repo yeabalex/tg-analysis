@@ -26,6 +26,7 @@ export const analyzeChannelBackground = inngest.createFunction(
   async ({ event, step }) => {
     const channelName = event.data.channelName;
     const jobId = event.data.jobId;
+    const chatId = event.data.chatId;
 
     // Step 1: Scrape Telegram
     const messages = await step.run("scrape-telegram", async () => {
@@ -140,6 +141,36 @@ export const analyzeChannelBackground = inngest.createFunction(
       // Disconnect cleanly
       redis.disconnect();
     });
+
+    // Step 5: Notify user via Telegram Bot
+    if (chatId) {
+      await step.run("notify-telegram", async () => {
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (!botToken) {
+          console.log(`[JOB ${jobId}] No bot token set, skipping notification.`);
+          return;
+        }
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tg-analysis.vercel.app';
+        const message = `🔥 *Your analysis for @${channelName} is ready!*\n\nTap below to see your personality breakdown 👇`;
+        
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '📊 View Results', web_app: { url: `${appUrl}?channel=${channelName}` } }
+              ]]
+            }
+          })
+        });
+        console.log(`[JOB ${jobId}] Telegram notification sent to chat ${chatId}`);
+      });
+    }
 
     return { success: true, channel: channelName, engine };
   }

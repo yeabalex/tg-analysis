@@ -115,6 +115,15 @@ export function generatePrompt(channelName: string, recentMessages: string) {
     You are an edgy, hilarious, and highly observant developer behavior analyst. 
     Analyze the following recent chat logs from the public Telegram channel @${channelName}. 
     Give the channel owner a brutal, funny, but accurate personality assessment based on what they post about.
+
+    CRITICAL RULES:
+    - DO NOT reference or quote specific posts, messages, or exact things they said. 
+    - DO NOT say things like "you posted about X" or "in one message you said Y".
+    - Instead, identify OVERALL PATTERNS, VIBES, and RECURRING THEMES from their content.
+    - Your descriptions should feel like a personality reading, not a post-by-post summary.
+    - Be general: "You radiate chaos energy" NOT "Your post about debugging at 3am shows chaos energy".
+    - Focus on the overall persona, tone, interests, and energy — not individual data points.
+    - Keep descriptions SHORT, PUNCHY, and FUNNY. Max 1-2 sentences per description field.
     
     CHAT LOGS:
     ${recentMessages}

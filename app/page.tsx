@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronRight, Loader2, ArrowLeft, Skull, Brain, Code, Terminal, Trophy, MessageSquare, Activity, Crown, GraduationCap, X, CheckCircle2, Users, Star, Flame, Zap, ShieldAlert, Swords, Heart, Monitor, Globe, Shield, Ticket, Box, AlertTriangle, Flag, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronRight, Loader2, ArrowLeft, Skull, Brain, Code, Terminal, Trophy, MessageSquare, Activity, Crown, GraduationCap, X, CheckCircle2, Users, Star, Flame, Zap, ShieldAlert, Swords, Heart, Monitor, Globe, Shield, Ticket, Box, AlertTriangle, Flag, TrendingUp, TrendingDown, Send, Bell } from "lucide-react";
 
 const loadingMessages = [
   "Scanning channel activity...",
@@ -282,6 +282,10 @@ declare global {
         ready: () => void;
         expand: () => void;
         close: () => void;
+        initDataUnsafe?: {
+          user?: { id: number };
+          chat?: { id: number };
+        };
         BackButton: {
           show: () => void;
           hide: () => void;
@@ -308,6 +312,15 @@ export default function App() {
   const [stats, setStats] = useState<any>(null);
   const [loadingMsg, setLoadingMsg] = useState(loadingMessages[0]);
   const [expandedLanguage, setExpandedLanguage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Telegram WebApp SDK init
   useEffect(() => {
@@ -360,37 +373,55 @@ export default function App() {
     if (e) e.preventDefault();
     const targetUsername = directUsername || username;
     if (!targetUsername) return;
+    const cleanName = targetUsername.replace('@', '').trim();
     window.Telegram?.WebApp.HapticFeedback.impactOccurred('medium');
-    setViewMode('loading'); setResult(null); setUsername(targetUsername.replace('@', '').trim());
+    setResult(null); setUsername(cleanName);
+
+    // Get Telegram chatId for bot notification
+    const chatId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null;
 
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelName: targetUsername.replace('@', '').trim() }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelName: cleanName, chatId }) });
       const data = await res.json();
+
+      if (data.error) {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+        setToast({ message: data.error, type: 'error' });
+        return;
+      }
+
       const finishProcess = (analysisData: any) => {
         window.Telegram?.WebApp.HapticFeedback.notificationOccurred('success');
         setResult(analysisData);
         setViewMode(isLeaderboardClick ? 'full' : 'story');
       };
 
-      if (data.cached) return setTimeout(() => finishProcess(data.data), 800);
+      // If cached, load instantly
+      if (data.cached) {
+        setViewMode('loading');
+        return setTimeout(() => finishProcess(data.data), 800);
+      }
 
-      const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/status?jobId=${data.jobId}&t=${Date.now()}`, { cache: 'no-store' });
-        const statusData = await statusRes.json();
-        if (statusData.status === "completed") {
-          clearInterval(poll);
-          if (statusData.data.error) {
-            window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
-            alert(statusData.data.error);
-            setViewMode('home');
-          } else {
-            finishProcess(statusData.data);
-            fetch(`/api/leaderboard?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(d => { setLeaderboards(d.leaderboards); setStats(d.stats); });
-          }
-        }
-      }, 2000);
-    } catch (err) { console.error(err); setViewMode('home'); }
+      // Otherwise, show toast and return to home - bot will notify when done
+      window.Telegram?.WebApp.HapticFeedback.notificationOccurred('success');
+      setToast({ message: `Analysis started for @${cleanName}! You'll get a notification when it's ready.`, type: 'success' });
+      setViewMode('home');
+
+    } catch (err) { console.error(err); setToast({ message: 'Something went wrong. Try again.', type: 'error' }); setViewMode('home'); }
   };
+
+  // Toast UI overlay
+  const ToastOverlay = toast ? (
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] animate-[slideDown_0.3s_ease-out]">
+      <div className={`rounded-2xl px-5 py-4 flex items-center gap-3 shadow-2xl border backdrop-blur-xl ${
+        toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' : 'bg-red-500/20 border-red-500/30 text-red-300'
+      }`}>
+        {toast.type === 'success' ? <Bell size={20} className="shrink-0" /> : <AlertTriangle size={20} className="shrink-0" />}
+        <span className="text-sm font-bold leading-tight">{toast.message}</span>
+        <button onClick={() => setToast(null)} className="ml-auto shrink-0 p-1 hover:bg-white/10 rounded-full transition-colors"><X size={16} /></button>
+      </div>
+    </div>
+  ) : null;
 
   if (viewMode === 'loading') {
     return (
@@ -539,6 +570,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#FF6B00]/30 overflow-x-hidden max-w-md mx-auto w-full">
+      {ToastOverlay}
       <div className="pt-16 pb-12 px-6 relative">
         <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#FF6B00]/10 to-transparent pointer-events-none" />
         <h1 className="text-[4rem] font-black tracking-tighter leading-[0.9] mb-8 text-white relative z-10">
