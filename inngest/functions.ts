@@ -18,7 +18,7 @@ export const analyzeChannelBackground = inngest.createFunction(
       const jobId = event.data.event.data.jobId;
       const Redis = require('ioredis');
       const redis = new Redis(process.env.REDIS_URL);
-      await redis.set(`job:${jobId}`, JSON.stringify({ error: error.message || "Failed to analyze channel" }), 'EX', 86400);
+      await redis.set(`job:${jobId}`, JSON.stringify({ error: error.message || "Failed to analyze channel" }));
       redis.disconnect();
     },
     triggers: [{ event: "app/analyze.channel" }]
@@ -133,10 +133,9 @@ export const analyzeChannelBackground = inngest.createFunction(
         completedAt: new Date().toISOString()
       };
 
-      // Save to Redis and set it to expire in 24 hours (86400 seconds) so it doesn't clutter forever
-      // We save TWO keys: one for the specific job, and one for the channel caching
-      await redis.set(`job:${jobId}`, JSON.stringify(payload), 'EX', 86400);
-      await redis.set(`channel:${channelName.toLowerCase()}`, JSON.stringify(payload), 'EX', 86400);
+      // Save permanently — one key for the specific job, one for the channel cache
+      await redis.set(`job:${jobId}`, JSON.stringify(payload));
+      await redis.set(`channel:${channelName.toLowerCase()}`, JSON.stringify(payload));
 
       // Increment persistent all-time counter for total creators analyzed
       await redis.incr('stats:total_analyzed');
