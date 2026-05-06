@@ -6,7 +6,12 @@ const AVATAR_CACHE_TTL_SECONDS = 60 * 60 * 24;
 const FALLBACK_CACHE_TTL_SECONDS = 60 * 5;
 
 function getFallbackAvatar(channel: string) {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(channel)}&background=1A1A1A&color=FF6B00&size=150&bold=true`;
+  const firstWord = channel
+    .split(/[\s._-]+/)
+    .map((part) => part.trim())
+    .find((part) => part.length > 0) || channel;
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(firstWord)}&background=1A1A1A&color=FF6B00&size=150&bold=true`;
 }
 
 function extractAvatarUrl(html: string) {
